@@ -9,8 +9,8 @@
 #include <iostream>
 #include <algorithm>
 
-constexpr size_t BLOCK_SIZE = 4096; 
-constexpr size_t CACHE_SIZE = 16;  
+constexpr size_t BLOCK_SIZE = 4096; //bytes
+constexpr size_t CACHE_SIZE = 16;  //block count
 
 struct Block {
     off_t blockNumber;
@@ -27,7 +27,7 @@ public:
     BlockCache(size_t cacheSize) : cacheSize(cacheSize) {}
 
     int openFile(const char* path) {
-        int fd = ::open(path, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+        int fd = open(path, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR); 
         if (fd == -1) {
             perror("Error opening file");
             return -1;
@@ -83,12 +83,18 @@ public:
     }
 
     void sync(int fd) {
-        for (auto& block : cache) {
-            if (block.dirty) {
-                writeBlockToDisk(fd, block);
-            }
+    if (fd < 0) {
+        std::cerr << "Invalid file descriptor during sync\n";
+        return;
+    }
+
+    for (auto& block : cache) {
+        if (block.dirty) {
+            writeBlockToDisk(fd, block);
         }
     }
+}
+
 
 private:
     size_t cacheSize;
@@ -104,15 +110,20 @@ private:
     }
 
     void loadBlock(int fd, off_t blockNumber) {
-        if (cache.size() >= cacheSize) {
-            evictBlock(fd);
-        }
-
-        std::vector<char> data(BLOCK_SIZE, 0);
-        pread(fd, data.data(), BLOCK_SIZE, blockNumber * BLOCK_SIZE);
-        cache.emplace_back(blockNumber, data, false);
-        blockMap[blockNumber] = --cache.end();
+    if (cache.size() >= cacheSize) {
+        evictBlock(fd);
     }
+
+    std::vector<char> data(BLOCK_SIZE, 0);
+    if (pread(fd, data.data(), BLOCK_SIZE, blockNumber * BLOCK_SIZE) == -1) {
+        perror("Error loading block");
+        return; 
+    }
+
+    cache.emplace_back(blockNumber, data, false);
+    blockMap[blockNumber] = --cache.end();
+}
+
 
     void evictBlock(int fd) {
         Block& block = cache.front();
@@ -123,10 +134,15 @@ private:
         cache.pop_front();
     }
 
+   
     void writeBlockToDisk(int fd, Block& block) {
-        pwrite(fd, block.data.data(), BLOCK_SIZE, block.blockNumber * BLOCK_SIZE);
+        if (pwrite(fd, block.data.data(), BLOCK_SIZE, block.blockNumber * BLOCK_SIZE) == -1) {
+            perror("Error writing block to disk");
+            return;
+        }
         block.dirty = false;
     }
+
 };
 
 // API для работы с кэшем
