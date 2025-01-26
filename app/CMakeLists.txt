@@ -1,16 +1,23 @@
 cmake_minimum_required(VERSION 3.12)
 project(app
         VERSION 0.0.0
-        DESCRIPTION "Application module"
+        DESCRIPTION "Cache Test Application"
         LANGUAGES C CXX
 )
 
 cmake_policy(SET CMP0076 NEW) # avoid warning of relative paths translation
 
-add_executable(app)
-target_include_directories(app PRIVATE ${CMAKE_SOURCE_DIR})
 
-target_sources(app
-        PRIVATE
-        app.c # or app.cpp
+add_library(cache_cpp SHARED
+    cache.cpp
+    cache.hpp
 )
+target_include_directories(cache_cpp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_executable(cache_test
+    cache_test.cpp
+)
+
+target_link_libraries(cache_test PRIVATE cache_cpp)
+
+
